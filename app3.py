@@ -1,11 +1,19 @@
+import cv2
 import numpy as np
 import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-import cv2
+import time
+
+
+def wide_space_default():
+    st.set_page_config(layout="wide")
+
+wide_space_default()
+
 
 # Load the trained models
-vgg16_model = tf.keras.models.load_model("train.keras")
+vgg16_model = tf.keras.models.load_model("vgg16_model.keras")
 densenet_model = tf.keras.models.load_model("densenet_model.keras")
 
 # Function to preprocess the input image
@@ -96,7 +104,7 @@ if uploaded_file is not None:
         5: "Retinal Vein Occlusion - RVO",
         6: "Vitreomacular Interface Disease - VID",
     }
-
+    vgg_start = time.time()
     vgg16_predicted_label = labels[vgg16_class_index[0]]
     vgg16_confidence = vgg16_confidence_scores[vgg16_class_index[0]]
     vgg16_confidence_percentage = vgg16_confidence * 100  # Convert to percentage
@@ -108,8 +116,35 @@ if uploaded_file is not None:
         processed_img, vgg16_model, last_conv_layer_name_vgg16)
     img_array = np.array(img)
     vgg16_gradcam_img = overlay_gradcam(img_array, vgg16_heatmap)
+    vgg_stop = time.time()
+    vgg_total = round(vgg_stop - vgg_start, 3)
+    
+    # Create two columns for the output
+    col1, col2 = st.columns(2)
+
+    # VGG16 Output
+    with col1:
+        st.header("VGG16 Result")
+        st.image(vgg16_gradcam_img, caption="VGG16 Grad-CAM",
+                 use_column_width=True)
+        st.write(f"Predicted Label: {vgg16_predicted_label}")
+        st.write(f"Confidence Score: {vgg16_confidence:.4f} or {
+                 vgg16_confidence_percentage:.2f}%")
+        st.header(f"Total time take to predict: {vgg_total} Seconds")
+        st.write(" ")
+        st.write(" ")
+        st.title("Confidence Scores for all classes (VGG16):")
+        st.write(" ")
+        st.write(" ")
+        st.write(" ")
+        for i, label in labels.items():
+            score = vgg16_confidence_scores[i]
+            percentage = score * 100
+            st.write(f"{label}: {score:.4f} or {percentage:.2f}%")
+
 
     # DenseNet Predictions
+    dense_start = time.time()
     densenet_predictions = densenet_model.predict(processed_img)
     densenet_class_index = np.argmax(densenet_predictions, axis=1)
     densenet_confidence_scores = densenet_predictions[0]
@@ -123,35 +158,21 @@ if uploaded_file is not None:
     densenet_heatmap = make_gradcam_heatmap(
         processed_img, densenet_model, last_conv_layer_name_densenet)
     densenet_gradcam_img = overlay_gradcam(img_array, densenet_heatmap)
+    dense_stop = time.time()
+    dense_total = round(dense_stop - dense_start, 3)
 
-    # Create two columns for the output
-    col1, col2 = st.columns(2)
-
-    # VGG16 Output
-    with col1:
-        st.header("VGG16 Results")
-        st.image(vgg16_gradcam_img, caption="VGG16 Grad-CAM",
-                 use_column_width=True)
-        st.write(f"Predicted Label: {vgg16_predicted_label}")
-        st.write(f"Confidence Score: {vgg16_confidence:.4f} or {
-                 vgg16_confidence_percentage:.2f}%")
-        st.write(" ")
-        st.title("Confidence Scores for all classes (VGG16):")
-        for i, label in labels.items():
-            score = vgg16_confidence_scores[i]
-            percentage = score * 100
-            st.write(f"{label}: {score:.4f} or {percentage:.2f}%")
 
     # DenseNet121 Output
     with col2:
-        st.header("DenseNet21 Results")
-        st.image(densenet_gradcam_img, caption="DenseNet21 Grad-CAM",
+        st.header("DenseNet121 Result")
+        st.image(densenet_gradcam_img, caption="DenseNet121 Grad-CAM",
                  use_column_width=True)
         st.write(f"Predicted Label: {densenet_predicted_label}")
         st.write(f"Confidence Score: {densenet_confidence:.4f} or {
                  densenet_confidence_percentage:.2f}%")
+        st.header(f"Total time take to predict: {dense_total} Seconds")
         st.write(" ")
-        st.title("Confidence Scores for all classes (DenseNet21):")
+        st.title("Confidence Scores for all classes (DenseNet121):")
         for i, label in labels.items():
             score = densenet_confidence_scores[i]
             percentage = score * 100
